@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from 'react-query';
-import { PlayIcon, StopIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, StopIcon, ArrowPathIcon, CpuChipIcon } from '@heroicons/react/24/outline';
 import { api } from '../services/api';
 
 export const Agents: React.FC = () => {
@@ -24,14 +24,27 @@ export const Agents: React.FC = () => {
     }
   };
 
+  const getAgentIcon = (agentId: string) => {
+    return <CpuChipIcon className="h-6 w-6" />;
+  };
+
+  const getAgentDescription = (agentId: string) => {
+    const descriptions = {
+      observer: 'Monitors system health, detects events, and generates alerts',
+      planner: 'Creates workflow plans, decomposes tasks, and optimizes resources',
+      executor: 'Executes tasks, manages workflows, and monitors progress'
+    };
+    return descriptions[agentId] || 'AI agent for workflow automation';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
+          <h1 className="text-2xl font-bold text-gray-900">AI Agents</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage your multi-agent system
+            Manage your functional LangChain-powered agents
           </p>
         </div>
         <button
@@ -63,17 +76,38 @@ export const Agents: React.FC = () => {
               </span>
             </div>
 
-            <div className="space-y-2 mb-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Uptime:</span>
-                <span className="text-gray-900">{agent.uptime}</span>
+            <div className="space-y-3 mb-4">
+              <p className="text-sm text-gray-600">
+                {getAgentDescription(agent.agent_id)}
+              </p>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Uptime:</span>
+                  <span className="text-gray-900">{agent.uptime}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Current Task:</span>
+                  <span className="text-gray-900">{agent.current_task || 'Idle'}</span>
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Last Heartbeat:</span>
-                <span className="text-gray-900">
-                  {new Date(agent.last_heartbeat).toLocaleTimeString()}
-                </span>
-              </div>
+
+              {/* Capabilities */}
+              {agent.capabilities && (
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Capabilities:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {agent.capabilities.map((capability: string, index: number) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
+                      >
+                        {capability}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex space-x-2">
@@ -121,9 +155,19 @@ export const Agents: React.FC = () => {
                   <span className="ml-2 text-gray-900">{agent.uptime}</span>
                 </div>
                 <div>
+                  <span className="text-gray-500">Current Task:</span>
+                  <span className="ml-2 text-gray-900">{agent.current_task || 'Idle'}</span>
+                </div>
+                <div>
                   <span className="text-gray-500">Last Heartbeat:</span>
                   <span className="ml-2 text-gray-900">
-                    {new Date(agent.last_heartbeat).toLocaleString()}
+                    {new Date(agent.last_heartbeat).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Capabilities:</span>
+                  <span className="ml-2 text-gray-900">
+                    {agent.capabilities?.length || 0} features
                   </span>
                 </div>
               </div>

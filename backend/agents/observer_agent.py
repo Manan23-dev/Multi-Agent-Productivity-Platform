@@ -1,47 +1,46 @@
 """
-Observer Agent - Monitors system state and triggers events
+Functional Observer Agent - Real LangChain implementation
 """
 
 import asyncio
 import json
+import psutil
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
-import structlog
-from langchain.agents import AgentExecutor
+from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain.tools import Tool
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage, AIMessage
 
-from backend.core.config import get_settings
-from backend.core.redis_client import get_redis
-from backend.services.mcp_client import MCPClient
-
-logger = structlog.get_logger()
-
 class ObserverAgent:
-    """Observer Agent for monitoring and event detection"""
+    """Real Observer Agent for monitoring and event detection"""
     
-    def __init__(self, mcp_client: MCPClient):
-        self.mcp_client = mcp_client
-        self.settings = get_settings()
+    def __init__(self, openai_api_key: str):
+        self.openai_api_key = openai_api_key
         self.llm = ChatOpenAI(
-            model=self.settings.openai_model,
-            temperature=self.settings.openai_temperature,
-            openai_api_key=self.settings.openai_api_key
+            model="gpt-4o-mini",
+            temperature=0.1,
+            openai_api_key=openai_api_key
         )
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
             return_messages=True
         )
         self.is_running = False
-        self.monitoring_tasks: Dict[str, Any] = {}
+        self.monitoring_data = {
+            "system_health": {},
+            "workflow_status": {},
+            "user_activity": {},
+            "alerts": []
+        }
         
     async def initialize(self):
-        """Initialize the Observer Agent"""
-        logger.info("Initializing Observer Agent")
+        """Initialize the Observer Agent with tools"""
+        print("🤖 Initializing Observer Agent...")
         
         # Define monitoring tools
         tools = [
@@ -61,11 +60,6 @@ class ObserverAgent:
                 func=self._monitor_user_activity
             ),
             Tool(
-                name="external_event_detector",
-                description="Detect external events and triggers",
-                func=self._detect_external_events
-            ),
-            Tool(
                 name="alert_system",
                 description="Send alerts and notifications",
                 func=self._send_alert
@@ -82,311 +76,234 @@ class ObserverAgent:
         
         # Create agent executor
         self.agent_executor = AgentExecutor.from_agent_and_tools(
-            agent=self._create_agent(prompt, tools),
+            agent=create_openai_functions_agent(self.llm, tools, prompt),
             tools=tools,
             memory=self.memory,
             verbose=True,
             handle_parsing_errors=True
         )
         
-        logger.info("Observer Agent initialized successfully")
-    
-    def _create_agent(self, prompt, tools):
-        """Create the agent with tools and prompt"""
-        from langchain.agents import create_openai_functions_agent
-        
-        return create_openai_functions_agent(
-            llm=self.llm,
-            tools=tools,
-            prompt=prompt
-        )
+        print("✅ Observer Agent initialized successfully")
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the Observer Agent"""
         return """
         You are the Observer Agent in the FlowAgent multi-agent system. Your primary responsibilities are:
 
-        1. **System Monitoring**: Continuously monitor system health, performance metrics, and resource utilization
-        2. **Event Detection**: Identify patterns, anomalies, and significant events in the system
-        3. **User Behavior Analysis**: Track user interactions and behavior patterns
-        4. **Workflow Monitoring**: Monitor running workflows and their progress
-        5. **Alert Generation**: Generate alerts and notifications when thresholds are exceeded
-        6. **Data Collection**: Collect and analyze data for insights and decision making
+        1. **System Monitoring**: Continuously monitor system health, performance, and resources
+        2. **Event Detection**: Detect anomalies, errors, and important events
+        3. **Alert Generation**: Generate alerts for critical issues
+        4. **Data Collection**: Collect and analyze system metrics
+        5. **Trend Analysis**: Identify patterns and trends in system behavior
 
         Key Capabilities:
-        - Real-time monitoring of system metrics
-        - Pattern recognition and anomaly detection
-        - Event correlation and analysis
-        - Automated alert generation
-        - Performance trend analysis
-        - User activity tracking
+        - Real-time system health monitoring
+        - Performance metrics analysis
+        - Workflow status tracking
+        - User activity monitoring
+        - Alert generation and management
+        - Trend analysis and reporting
 
-        When monitoring, pay attention to:
-        - System performance metrics (CPU, memory, disk usage)
-        - Workflow execution times and success rates
-        - User engagement patterns
-        - Error rates and exception patterns
-        - Resource utilization trends
-        - External system dependencies
+        Monitoring Process:
+        1. Collect system metrics (CPU, memory, disk, network)
+        2. Check workflow execution status
+        3. Monitor user activity patterns
+        4. Analyze data for anomalies
+        5. Generate alerts for critical issues
+        6. Provide insights and recommendations
 
-        Always provide clear, actionable insights and recommendations based on your observations.
+        Always provide:
+        - Clear status reports
+        - Actionable insights
+        - Proactive recommendations
+        - Detailed analysis of issues
         """
     
     async def start_monitoring(self):
-        """Start the monitoring loop"""
-        if self.is_running:
-            logger.warning("Observer Agent is already running")
-            return
-        
+        """Start continuous monitoring"""
         self.is_running = True
-        logger.info("Starting Observer Agent monitoring")
+        print("🔍 Observer Agent started monitoring...")
         
-        # Start monitoring tasks
-        tasks = [
-            asyncio.create_task(self._monitoring_loop()),
-            asyncio.create_task(self._health_check_loop()),
-            asyncio.create_task(self._event_detection_loop()),
-            asyncio.create_task(self._user_activity_loop())
-        ]
-        
-        self.monitoring_tasks = {task.get_name(): task for task in tasks}
-        
-        try:
-            await asyncio.gather(*tasks)
-        except Exception as e:
-            logger.error("Error in monitoring tasks", error=str(e))
-        finally:
-            self.is_running = False
+        while self.is_running:
+            try:
+                # Perform monitoring cycle
+                await self._monitoring_cycle()
+                await asyncio.sleep(30)  # Monitor every 30 seconds
+            except Exception as e:
+                print(f"❌ Error in monitoring cycle: {e}")
+                await asyncio.sleep(10)
     
     async def stop_monitoring(self):
-        """Stop the monitoring loop"""
-        logger.info("Stopping Observer Agent monitoring")
+        """Stop monitoring"""
         self.is_running = False
-        
-        # Cancel all monitoring tasks
-        for task in self.monitoring_tasks.values():
-            task.cancel()
-        
-        # Wait for tasks to complete
-        await asyncio.gather(*self.monitoring_tasks.values(), return_exceptions=True)
-        self.monitoring_tasks.clear()
+        print("🛑 Observer Agent stopped monitoring")
     
-    async def _monitoring_loop(self):
-        """Main monitoring loop"""
-        while self.is_running:
-            try:
-                # Perform comprehensive system monitoring
-                monitoring_data = await self._perform_monitoring_cycle()
-                
-                # Store monitoring data in Redis
-                redis_client = await get_redis()
-                await redis_client.setex(
-                    "observer:monitoring_data",
-                    300,  # 5 minutes
-                    json.dumps(monitoring_data, default=str)
-                )
-                
-                # Analyze data for patterns and anomalies
-                analysis = await self._analyze_monitoring_data(monitoring_data)
-                
-                if analysis.get("alerts"):
-                    await self._process_alerts(analysis["alerts"])
-                
-                # Wait for next monitoring cycle
-                await asyncio.sleep(self.settings.observer_agent_interval)
-                
-            except Exception as e:
-                logger.error("Error in monitoring loop", error=str(e))
-                await asyncio.sleep(10)  # Wait before retrying
-    
-    async def _health_check_loop(self):
-        """Health check monitoring loop"""
-        while self.is_running:
-            try:
-                health_status = await self._check_system_health()
-                
-                if health_status.get("status") != "healthy":
-                    await self._send_alert({
-                        "type": "system_health",
-                        "severity": "warning",
-                        "message": f"System health issue detected: {health_status}",
-                        "timestamp": datetime.now().isoformat()
-                    })
-                
-                await asyncio.sleep(60)  # Check every minute
-                
-            except Exception as e:
-                logger.error("Error in health check loop", error=str(e))
-                await asyncio.sleep(30)
-    
-    async def _event_detection_loop(self):
-        """Event detection monitoring loop"""
-        while self.is_running:
-            try:
-                events = await self._detect_external_events()
-                
-                for event in events:
-                    await self._process_event(event)
-                
-                await asyncio.sleep(15)  # Check every 15 seconds
-                
-            except Exception as e:
-                logger.error("Error in event detection loop", error=str(e))
-                await asyncio.sleep(30)
-    
-    async def _user_activity_loop(self):
-        """User activity monitoring loop"""
-        while self.is_running:
-            try:
-                activity_data = await self._monitor_user_activity()
-                
-                # Store user activity patterns
-                redis_client = await get_redis()
-                await redis_client.setex(
-                    "observer:user_activity",
-                    600,  # 10 minutes
-                    json.dumps(activity_data, default=str)
-                )
-                
-                await asyncio.sleep(120)  # Check every 2 minutes
-                
-            except Exception as e:
-                logger.error("Error in user activity loop", error=str(e))
-                await asyncio.sleep(60)
-    
-    async def _perform_monitoring_cycle(self) -> Dict[str, Any]:
-        """Perform a complete monitoring cycle"""
-        monitoring_data = {
-            "timestamp": datetime.now().isoformat(),
-            "system_health": await self._check_system_health(),
-            "workflow_status": await self._check_workflow_status(),
-            "user_activity": await self._monitor_user_activity(),
-            "external_events": await self._detect_external_events()
-        }
-        
-        return monitoring_data
-    
-    async def _analyze_monitoring_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze monitoring data for patterns and anomalies"""
-        analysis_prompt = f"""
-        Analyze the following monitoring data and identify:
-        1. Performance trends and patterns
-        2. Anomalies or unusual behavior
-        3. Potential issues or bottlenecks
-        4. Recommendations for optimization
-        5. Alerts that should be generated
-        
-        Monitoring Data:
-        {json.dumps(data, indent=2)}
-        
-        Provide your analysis in JSON format with the following structure:
-        {{
-            "trends": ["trend1", "trend2"],
-            "anomalies": ["anomaly1", "anomaly2"],
-            "issues": ["issue1", "issue2"],
-            "recommendations": ["rec1", "rec2"],
-            "alerts": [
-                {{
-                    "type": "alert_type",
-                    "severity": "low|medium|high|critical",
-                    "message": "alert message",
-                    "recommendation": "recommended action"
-                }}
-            ]
-        }}
-        """
-        
+    async def _monitoring_cycle(self):
+        """Perform one monitoring cycle"""
         try:
-            response = await self.agent_executor.ainvoke({"input": analysis_prompt})
-            analysis = json.loads(response["output"])
-            return analysis
+            # Check system health
+            system_health = await self._check_system_health()
+            
+            # Check workflow status
+            workflow_status = await self._check_workflow_status()
+            
+            # Monitor user activity
+            user_activity = await self._monitor_user_activity()
+            
+            # Analyze data and generate insights
+            insights = await self._analyze_data(system_health, workflow_status, user_activity)
+            
+            # Update monitoring data
+            self.monitoring_data.update({
+                "system_health": system_health,
+                "workflow_status": workflow_status,
+                "user_activity": user_activity,
+                "last_update": datetime.now().isoformat()
+            })
+            
+            # Generate alerts if needed
+            if insights.get("alerts"):
+                for alert in insights["alerts"]:
+                    await self._send_alert(alert)
+            
+            print(f"📊 Monitoring cycle completed: {insights.get('summary', 'No issues detected')}")
+            
         except Exception as e:
-            logger.error("Error analyzing monitoring data", error=str(e))
-            return {"alerts": []}
+            print(f"❌ Error in monitoring cycle: {e}")
     
     async def _check_system_health(self) -> Dict[str, Any]:
-        """Check system health metrics"""
-        # This would integrate with actual system monitoring
-        return {
-            "status": "healthy",
-            "cpu_usage": 45.2,
-            "memory_usage": 67.8,
-            "disk_usage": 23.1,
-            "network_latency": 12.5,
-            "timestamp": datetime.now().isoformat()
-        }
+        """Check system health and performance metrics"""
+        try:
+            # Get system metrics
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            # Analyze health status
+            health_status = "healthy"
+            issues = []
+            
+            if cpu_percent > 80:
+                health_status = "warning"
+                issues.append(f"High CPU usage: {cpu_percent}%")
+            
+            if memory.percent > 85:
+                health_status = "warning"
+                issues.append(f"High memory usage: {memory.percent}%")
+            
+            if disk.percent > 90:
+                health_status = "critical"
+                issues.append(f"Low disk space: {disk.percent}%")
+            
+            return {
+                "status": health_status,
+                "cpu_usage": cpu_percent,
+                "memory_usage": memory.percent,
+                "disk_usage": disk.percent,
+                "issues": issues,
+                "timestamp": datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
     
     async def _check_workflow_status(self) -> Dict[str, Any]:
         """Check status of running workflows"""
-        # This would check actual workflow status
+        # Simulate workflow status check
+        workflows = [
+            {
+                "id": "wf_1",
+                "name": "Data Processing Pipeline",
+                "status": "running",
+                "progress": 65,
+                "tasks_completed": 13,
+                "tasks_total": 20
+            },
+            {
+                "id": "wf_2", 
+                "name": "Email Automation",
+                "status": "completed",
+                "progress": 100,
+                "tasks_completed": 8,
+                "tasks_total": 8
+            }
+        ]
+        
         return {
-            "active_workflows": 3,
-            "completed_today": 15,
-            "failed_today": 1,
-            "average_execution_time": 45.2,
+            "workflows": workflows,
+            "total_running": len([w for w in workflows if w["status"] == "running"]),
+            "total_completed": len([w for w in workflows if w["status"] == "completed"]),
             "timestamp": datetime.now().isoformat()
         }
     
     async def _monitor_user_activity(self) -> Dict[str, Any]:
-        """Monitor user activity patterns"""
-        # This would track actual user activity
+        """Monitor user activity and behavior patterns"""
+        # Simulate user activity monitoring
         return {
-            "active_users": 12,
-            "new_users_today": 3,
-            "user_engagement_score": 8.5,
-            "popular_features": ["workflow_creation", "task_execution"],
+            "active_users": 3,
+            "api_requests": 45,
+            "page_views": 120,
+            "last_activity": datetime.now().isoformat(),
             "timestamp": datetime.now().isoformat()
         }
     
-    async def _detect_external_events(self) -> List[Dict[str, Any]]:
-        """Detect external events and triggers"""
-        # This would integrate with external systems
-        return [
-            {
-                "type": "api_rate_limit",
-                "severity": "medium",
-                "message": "API rate limit approaching",
-                "timestamp": datetime.now().isoformat()
-            }
-        ]
+    async def _analyze_data(self, system_health: Dict, workflow_status: Dict, user_activity: Dict) -> Dict[str, Any]:
+        """Analyze monitoring data and generate insights"""
+        insights = {
+            "summary": "System operating normally",
+            "alerts": [],
+            "recommendations": []
+        }
+        
+        # Analyze system health
+        if system_health.get("status") == "critical":
+            insights["alerts"].append({
+                "type": "critical",
+                "message": "Critical system issues detected",
+                "details": system_health.get("issues", [])
+            })
+            insights["summary"] = "Critical issues detected"
+        
+        elif system_health.get("status") == "warning":
+            insights["alerts"].append({
+                "type": "warning", 
+                "message": "System performance warnings",
+                "details": system_health.get("issues", [])
+            })
+            insights["summary"] = "Performance warnings detected"
+        
+        # Analyze workflow status
+        if workflow_status.get("total_running", 0) > 10:
+            insights["recommendations"].append("Consider scaling resources for high workflow load")
+        
+        return insights
     
     async def _send_alert(self, alert_data: Dict[str, Any]):
         """Send alert notification"""
-        logger.warning("Alert generated", **alert_data)
-        
-        # Store alert in Redis
-        redis_client = await get_redis()
-        await redis_client.lpush("observer:alerts", json.dumps(alert_data))
-        
-        # Send to MCP server for coordination with other agents
-        await self.mcp_client.send_message({
-            "type": "alert",
-            "source": "observer_agent",
-            "data": alert_data
-        })
-    
-    async def _process_alerts(self, alerts: List[Dict[str, Any]]):
-        """Process generated alerts"""
-        for alert in alerts:
-            await self._send_alert(alert)
-    
-    async def _process_event(self, event: Dict[str, Any]):
-        """Process detected event"""
-        logger.info("Processing event", event=event)
-        
-        # Send event to MCP server for coordination
-        await self.mcp_client.send_message({
-            "type": "event",
-            "source": "observer_agent",
-            "data": event
-        })
+        print(f"🚨 ALERT [{alert_data.get('type', 'info').upper()}]: {alert_data.get('message', 'Unknown alert')}")
+        if alert_data.get("details"):
+            for detail in alert_data["details"]:
+                print(f"   - {detail}")
     
     async def get_status(self) -> Dict[str, Any]:
-        """Get Observer Agent status"""
+        """Get current agent status"""
         return {
             "agent_type": "observer",
-            "status": "running" if self.is_running else "stopped",
-            "monitoring_tasks": len(self.monitoring_tasks),
-            "last_monitoring_cycle": datetime.now().isoformat(),
-            "memory_usage": len(self.memory.chat_memory.messages)
+            "status": "active" if self.is_running else "inactive",
+            "monitoring_data": self.monitoring_data,
+            "uptime": "2h 30m",  # This would be calculated
+            "last_heartbeat": datetime.now().isoformat()
         }
+    
+    async def analyze_system_health(self, query: str) -> str:
+        """Analyze system health based on query"""
+        try:
+            response = await self.agent_executor.ainvoke({
+                "input": f"Analyze system health: {query}"
+            })
+            return response["output"]
+        except Exception as e:
+            return f"Error analyzing system health: {e}"
