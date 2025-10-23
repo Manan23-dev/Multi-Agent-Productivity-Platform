@@ -138,7 +138,7 @@ export const Agents: React.FC = () => {
       <div className="card">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Agent Details</h3>
         <div className="space-y-4">
-          {agentsStatus?.agents?.map((agent: any) => (
+          {(agentsStatus?.agents || []).map((agent: any) => (
             <div key={agent.agent_id} className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-medium text-gray-900 capitalize">
