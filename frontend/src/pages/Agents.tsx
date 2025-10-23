@@ -4,7 +4,8 @@ import { PlayIcon, StopIcon, ArrowPathIcon, CpuChipIcon } from '@heroicons/react
 import { api } from '../services/api';
 
 export const Agents: React.FC = () => {
-  const { data: agentsStatus, refetch } = useQuery('agents-status', api.getAgentsStatus);
+  const { data: agentsResponse, refetch } = useQuery('agents-status', api.getAgentsStatus);
+  const agentsStatus = agentsResponse?.data;
 
   const handleStartAgent = async (agentId: string) => {
     try {
@@ -29,7 +30,7 @@ export const Agents: React.FC = () => {
   };
 
   const getAgentDescription = (agentId: string) => {
-    const descriptions = {
+    const descriptions: { [key: string]: string } = {
       observer: 'Monitors system health, detects events, and generates alerts',
       planner: 'Creates workflow plans, decomposes tasks, and optimizes resources',
       executor: 'Executes tasks, manages workflows, and monitors progress'
@@ -58,7 +59,7 @@ export const Agents: React.FC = () => {
 
       {/* Agents Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {agentsStatus?.agents?.map((agent: any) => (
+        {(agentsStatus?.agents || []).map((agent: any) => (
           <div key={agent.agent_id} className="card">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">

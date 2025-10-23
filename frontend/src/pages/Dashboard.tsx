@@ -9,9 +9,13 @@ import {
 import { api } from '../services/api';
 
 export const Dashboard: React.FC = () => {
-  const { data: systemStatus } = useQuery('system-status', api.getSystemStatus);
-  const { data: agentsStatus } = useQuery('agents-status', api.getAgentsStatus);
-  const { data: workflowsStatus } = useQuery('workflows-status', api.getWorkflowsStatus);
+  const { data: systemResponse } = useQuery('system-status', api.getSystemStatus);
+  const { data: agentsResponse } = useQuery('agents-status', api.getAgentsStatus);
+  const { data: workflowsResponse } = useQuery('workflows-status', api.getWorkflowsStatus);
+  
+  const systemStatus = systemResponse?.data;
+  const agentsStatus = agentsResponse?.data;
+  const workflowsStatus = workflowsResponse?.data;
 
   const stats = [
     {
