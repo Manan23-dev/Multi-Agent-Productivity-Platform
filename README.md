@@ -2,13 +2,13 @@
 
 A sophisticated multi-agent system built with LangChain, FastAPI, React, and Redis for intelligent workflow automation.
 
-## 🚀 Live Demo
+## Live Demo
 
 - **Application**: https://flowagent.vercel.app
 - **API Health**: https://flowagent.vercel.app/api/health
 - **GitHub**: https://github.com/Manan23-dev/Multi-Agent-Productivity-Platform
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 React Frontend ←→ Vercel API ←→ LangChain Agents
@@ -16,13 +16,13 @@ React Frontend ←→ Vercel API ←→ LangChain Agents
                  OpenAI GPT-4
 ```
 
-## 🤖 AI Agents
+## AI Agents
 
 - **Observer**: Monitors system health, detects events, and generates alerts
 - **Planner**: Creates workflow plans, decomposes tasks, and optimizes resources  
 - **Executor**: Executes tasks, manages workflows, and monitors progress
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **Backend**: Vercel Serverless Functions
@@ -30,7 +30,7 @@ React Frontend ←→ Vercel API ←→ LangChain Agents
 - **Communication**: REST API
 - **Deployment**: Vercel (100% Free)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Local Development
 
@@ -73,23 +73,23 @@ React Frontend ←→ Vercel API ←→ LangChain Agents
    - Frontend: `https://your-project.vercel.app`
    - API: `https://your-project.vercel.app/api/health`
 
-## 📊 Features
+## Features
 
-✅ **Real AI Agents** with LangChain integration
-✅ **System Monitoring** with live metrics
-✅ **Workflow Automation** - create and execute workflows
-✅ **Agent Management** - start/stop agents with capabilities
-✅ **Progress Tracking** - real-time execution monitoring
-✅ **Error Handling** - intelligent retry and failure management
-✅ **Responsive Design** with Tailwind CSS
-✅ **100% Free** deployment on Vercel
+**Real AI Agents** with LangChain integration  
+**System Monitoring** with live metrics  
+**Workflow Automation** - create and execute workflows  
+**Agent Management** - start/stop agents with capabilities  
+**Progress Tracking** - real-time execution monitoring  
+**Error Handling** - intelligent retry and failure management  
+**Responsive Design** with Tailwind CSS  
+**100% Free** deployment on Vercel  
 
-## 🔧 Configuration
+## Configuration
 
 Required environment variables:
 - `OPENAI_API_KEY`: Your OpenAI API key
 
-## 📝 API Endpoints
+## API Endpoints
 
 - `GET /api/health` - Health check
 - `GET /api/status` - System status
@@ -97,7 +97,7 @@ Required environment variables:
 - `POST /api/agents/{id}/start` - Start agent
 - `POST /api/workflows/create` - Create workflow
 
-## 🤖 Agent Capabilities
+## Agent Capabilities
 
 ### Observer Agent
 - System health monitoring with psutil
@@ -120,7 +120,7 @@ Required environment variables:
 - Error handling and retry logic
 - Resource allocation
 
-## 🎯 Use Cases
+## Use Cases
 
 - **Data Processing**: Automated data transformation pipelines
 - **Email Automation**: Intelligent email processing and responses
@@ -128,12 +128,12 @@ Required environment variables:
 - **System Monitoring**: Real-time health checks and alerts
 - **Workflow Orchestration**: Complex task coordination
 
-## 📚 Documentation
+## Documentation
 
 - [Vercel Deployment Guide](VERCEL_DEPLOYMENT.md)
 - [API Documentation](https://your-project.vercel.app/api/health)
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
